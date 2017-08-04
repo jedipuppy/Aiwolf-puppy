@@ -61,6 +61,7 @@ def connect_parse(agent):
                 game_info = obj_recv['gameInfo']
                 if game_info is None:
                     game_info = dict()
+
                 # talk_history and whisper_history
                 talk_history = obj_recv['talkHistory']
                 if talk_history is None:
@@ -71,7 +72,6 @@ def connect_parse(agent):
                 # request must exist
                 # print(obj_recv['request'])
                 request = obj_recv['request']
-                
                 # run requested
                 if request == 'NAME':
                     sock.send((agent.getName() + '\n').encode('utf-8'))
@@ -87,6 +87,8 @@ def connect_parse(agent):
                     base_info["roleMap"] = game_info["roleMap"]
                     base_info["executedAgent"] = game_info["executedAgent"]
 
+
+
                     # update
                     for k in ["day", "remainTalkMap", "remainWhisperMap", "statusMap"]:
                         if k in game_info.keys():
@@ -95,6 +97,8 @@ def connect_parse(agent):
                     parser.initialize(game_info, game_setting)
                     agent.initialize(base_info, parser.get_gamedf_diff(), game_setting)
                 elif request == 'DAILY_INITIALIZE':
+                    base_info["lastDeadAgentList"] = game_info["lastDeadAgentList"]
+                    base_info["voteList"] = game_info["voteList"]
                     # update
                     for k in ["day", "remainTalkMap", "remainWhisperMap", "statusMap"]:
                         if k in game_info.keys():
@@ -116,6 +120,9 @@ def connect_parse(agent):
                         if k in game_info.keys():
                             base_info[k] =  game_info[k]
                     parser.update(game_info, talk_history, whisper_history, request)
+                    f = open("game_info.txt", 'w') # 書き込みモードで開く
+                    f.write(str(game_info)) # 引数の文字列をファイルに書き込む
+                    f.close() # ファイルを閉じる
                     agent.update(base_info, parser.get_gamedf_diff(), request)
                     # call
                     agent.finish()

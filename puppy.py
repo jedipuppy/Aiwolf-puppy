@@ -22,8 +22,8 @@ class PythonPlayer(object):
         # DataFrame -> P
         self.predicter_15 = aiwolfpy.puppy.Predictor_15()
         self.predicter_5 = aiwolfpy.puppy.Predictor_5()
-
-
+        self.guard_factor = [[10,2],[10,2],[10,2]]
+        self.threat_factor = np.ones([15,15])
 
     def getName(self):
         return self.myname
@@ -50,8 +50,8 @@ class PythonPlayer(object):
         self.not_reported = False
         self.vote_declare = 0
         self.file_num =0
-        self.day_depend_fake=[0.7,0.5,0.3,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]
-        self.last_idx = 1
+        self.day_depend_fake=[1,0.7,0.5,0.3,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]
+        self.attacked_agent = [-1,-1,-1]
         print("agent ID is "+str(self.base_info['agentIdx']))
 
 
@@ -78,9 +78,21 @@ class PythonPlayer(object):
                 # GUARD
                 if diff_data['type'][i] == 'guard':
                     self.myresult = diff_data['text'][i]
-                # GUARD
+                # EXECUTE
                 if diff_data['type'][i] == 'execute':
                     self.executed_agent = int(diff_data['agent'][i])
+
+            #
+            voteList = self.base_info['voteList']
+            if len(voteList) != 0:
+                for l in voteList:
+                    if l['target'] == self.base_info['agentIdx']:
+                        self.threat_factor[int(self.base_info['day']-1)][int(l['agent'])-1] *= 1.01
+
+            #Attacked 
+            if self.base_info['day'] < 5: 
+                self.attacked_agent[int(self.base_info['day'])-2] = self.seek_attacked()
+
             # POSSESSED
             if (self.base_info['myRole'] == 'POSSESSED') or (self.base_info['myRole'] == 'WEREWOLF') and self.comingout != '':
                 self.not_reported = True
@@ -221,6 +233,7 @@ class PythonPlayer(object):
                 idx = 1
                 for i in range(1, 16):
                     p0 = p0_mat[i-1, 1]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if str(i) in self.base_info['roleMap'].keys():
                         p0 *= self.day_depend_fake[self.base_info["day"]]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
@@ -231,6 +244,7 @@ class PythonPlayer(object):
                 idx = 1
                 for i in range(1, 16):
                     p0 = p0_mat[i-1, 1]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
                         idx = i
@@ -240,6 +254,7 @@ class PythonPlayer(object):
                 idx = 1
                 for i in range(1, 16):
                     p0 = p0_mat[i-1, 1]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
                         idx = i
@@ -251,6 +266,7 @@ class PythonPlayer(object):
                 idx = 1
                 for i in range(1, 6):
                     p0 = p0_mat[i-1, 3]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
                         idx = i
@@ -260,15 +276,18 @@ class PythonPlayer(object):
                 idx = 1
                 for i in range(1, 6):
                     p0 = p0_mat[i-1, 3]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
                         idx = i
             elif self.base_info['myRole'] == "SEER":
                 p0_mat = self.predicter_5.ret_pred_wx(3)
                 p = -1
+
                 idx = 1
                 for i in range(1, 6):
                     p0 = p0_mat[i-1, 1]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
                         idx = i
@@ -278,6 +297,7 @@ class PythonPlayer(object):
                 idx = 1
                 for i in range(1, 6):
                     p0 = p0_mat[i-1, 1]
+                    p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
                         idx = i
@@ -295,14 +315,13 @@ class PythonPlayer(object):
             idx = 1
 
             if self.base_info['day'] < 3 and len(self.base_info['statusMap']) % 2 != 0:
-                for i in range(0, 14):
-                    if list_seer[i] == 1 and str(i+1) not in self.base_info['roleMap'].keys():
+                for i in range(0, 15):
+                    if list_seer[i] == 1 and str(i+1) not in self.base_info['roleMap'].keys() and i+1 != self.seek_attacked():
                         if self.base_info['statusMap'][str(i+1)] == 'DEAD':
                             beguri = True
                         elif self.base_info['statusMap'][str(i+1)] == 'ALIVE':
                             idx = i+1
                 if attack_seer is not None and beguri == False:
-                    self.last_idx = idx 
                     return idx
 
 
@@ -311,10 +330,10 @@ class PythonPlayer(object):
             p0_sort = p0_mat[:,1].argsort()
             p0_sort_alive = []
 
-            for i in range(0,14):
+            for i in range(0,15):
 
 
-                if self.base_info['statusMap'][str(p0_sort[i]+1)] == 'ALIVE' and list_seer[i] == 0 and i+1 != self.last_idx:
+                if self.base_info['statusMap'][str(p0_sort[i]+1)] == 'ALIVE' and list_seer[i] == 0 and i+1 != self.seek_attacked():
                     p0_sort_alive.append(p0_sort[i])
 
             if len(self.base_info['statusMap']) % 2 == 0:
@@ -329,7 +348,6 @@ class PythonPlayer(object):
                 attack_index = 0
 
             idx = int(p0_sort_alive[attack_index])+1
-            self.last_idx = idx 
             return idx
         else:
 
@@ -339,7 +357,7 @@ class PythonPlayer(object):
             p0_mat = self.predicter_5.ret_pred_wx(1)
             for i in range(1, 6):
                 p0 = p0_mat[i-1, 2]
-
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                 if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 < p and i != self.base_info['agentIdx']:
 
                     p = p0
@@ -381,26 +399,18 @@ class PythonPlayer(object):
             medium_killed = self.predicter_15.medium_killed()
             list_seer= list(self.predicter_15.list_seer())
             list_medium= list(self.predicter_15.list_medium())
+            day = int(self.base_info['day'])
             # highest prob hm in alive agents
-            if num_seer == 1 or seer_killed == False:
-                seer_guard_factor = 10
-            else:
-                seer_guard_factor = 1
-
-            if num_medium == 1 or medium_killed == False:
-                medium_guard_factor = 2
-            else:
-                medium_guard_factor = 1
 
             p0_mat = self.predicter_15.ret_pred_wn()              
             p = -1
             idx = 1
             for i in range(1, 16):
                 p0 = p0_mat[i-1, 0]
-                if list_seer[i-1] == 1:
-                    p0 *= seer_guard_factor
-                elif list_medium[i-1] == 1:
-                    p0 *= medium_guard_factor
+                if list_seer[i-1] == 1 and day < 4:
+                    p0 *= self.guard_factor[day-2][0]
+                elif list_medium[i-1] == 1 and day < 4:
+                    p0 *= self.guard_factor[day-2][1]
                 if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                     p = p0
                     idx = i
@@ -410,7 +420,26 @@ class PythonPlayer(object):
             return 1
 
     def finish(self):
-        pass
+        if self.game_setting['playerNum'] == 15:        
+            list_seer = list(self.predicter_15.list_seer())
+            list_medium = list(self.predicter_15.list_medium())
+            for i in range (0,3):
+                if self.attacked_agent[i] == -1:
+                    pass
+                elif list_seer[self.attacked_agent[i]-1]:   
+                    self.guard_factor[i][0] *= 1.05         
+                elif list_medium[self.attacked_agent[i]-1]:
+                    self.guard_factor[i][1] *= 1.05    
+                else:
+                    self.guard_factor[i][0] *= 0.95  
+                    self.guard_factor[i][0] *= 0.95 
+        print("guard factor") 
+        print(self.guard_factor)
+        print("role map") 
+        print(self.base_info['roleMap'])
+        print("threat_factor") 
+        print(self.threat_factor)
+
 
     def fake_seer(self):
         p = -1
@@ -475,6 +504,13 @@ class PythonPlayer(object):
             medium_result ="WEREWOLF"
         self.myresult = 'IDENTIFIED Agent[' + "{0:02d}".format(self.executed_agent) + '] ' + medium_result
         return self.myresult   
+
+    def seek_attacked(self):
+        attacked_agent = self.base_info['lastDeadAgentList']
+        if  len(attacked_agent) == 1 :
+            return int(attacked_agent[0])   
+        return -1
+
 agent = PythonPlayer(myname)
 
 # run
