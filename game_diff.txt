@@ -1,3 +1,0 @@
-Empty DataFrame
-Columns: [agent, day, idx, text, turn, type]
-Index: []

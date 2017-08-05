@@ -7,6 +7,7 @@ import aiwolfpy
 import aiwolfpy.contentbuilder as cb
 import pandas as pd
 from numpy.random import *
+import math
 # sample
 import aiwolfpy.puppy
 
@@ -22,7 +23,8 @@ class PythonPlayer(object):
         # DataFrame -> P
         self.predicter_15 = aiwolfpy.puppy.Predictor_15()
         self.predicter_5 = aiwolfpy.puppy.Predictor_5()
-        self.guard_factor = [[10,2],[10,2],[10,2]]
+        self.guard_factor = [[15,15],[15,15],[15,15]]
+        self.attack_result = np.zeros([15,3])
         self.threat_factor = np.ones([15,15])
 
     def getName(self):
@@ -52,7 +54,6 @@ class PythonPlayer(object):
         self.file_num =0
         self.day_depend_fake=[1,0.7,0.5,0.3,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]
         self.attacked_agent = [-1,-1,-1]
-        print("agent ID is "+str(self.base_info['agentIdx']))
 
 
     def update(self, base_info, diff_data, request):
@@ -408,9 +409,17 @@ class PythonPlayer(object):
             for i in range(1, 16):
                 p0 = p0_mat[i-1, 0]
                 if list_seer[i-1] == 1 and day < 4:
-                    p0 *= self.guard_factor[day-2][0]
+                    if self.attack_result[day-2][2] > 9 :
+                        x = (float(self.attack_result[day-2][0])/float(self.attack_result[day-2][2]))
+                    else:
+                        x = 0.3
+                    p0 *= self.guard_factor[day-2][0]*x
                 elif list_medium[i-1] == 1 and day < 4:
-                    p0 *= self.guard_factor[day-2][1]
+                    if self.attack_result[day-2][2]  > 9 :
+                        x = (float(self.attack_result[day-2][1])/float(self.attack_result[day-2][2]))
+                    else:
+                        x = 0.2
+                    p0 *= self.guard_factor[day-2][0]*x
                 if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                     p = p0
                     idx = i
@@ -427,18 +436,12 @@ class PythonPlayer(object):
                 if self.attacked_agent[i] == -1:
                     pass
                 elif list_seer[self.attacked_agent[i]-1]:   
-                    self.guard_factor[i][0] *= 1.05         
+                    self.attack_result[i][0] += 1      
                 elif list_medium[self.attacked_agent[i]-1]:
-                    self.guard_factor[i][1] *= 1.05    
+                    self.attack_result[i][1] += 1    
                 else:
-                    self.guard_factor[i][0] *= 0.95  
-                    self.guard_factor[i][0] *= 0.95 
-        print("guard factor") 
-        print(self.guard_factor)
-        print("role map") 
-        print(self.base_info['roleMap'])
-        print("threat_factor") 
-        print(self.threat_factor)
+                    self.attack_result[i][2] += 1 
+
 
 
     def fake_seer(self):
