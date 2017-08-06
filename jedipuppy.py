@@ -11,7 +11,7 @@ import math
 # sample
 import aiwolfpy.puppy
 
-myname = 'puppy'
+myname = 'jedipuppy'
 
 class PythonPlayer(object):
 
@@ -51,8 +51,10 @@ class PythonPlayer(object):
         self.executed_agent = 0
         self.not_reported = False
         self.vote_declare = 0
+        self.estimate_werewolf = 0 
+        self.estimate_villager = 0       
         self.file_num =0
-        self.day_depend_fake=[1,0.7,0.5,0.3,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]
+        self.day_depend_fake=[0.9,0.7,0.5,0.3,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]
         self.attacked_agent = [-1,-1,-1]
 
 
@@ -133,7 +135,7 @@ class PythonPlayer(object):
             if self.base_info['myRole'] == 'SEER' and self.comingout == '':
                 self.comingout = 'SEER'
                 return cb.comingout(self.base_info['agentIdx'], self.comingout)
-            elif self.base_info['myRole'] == 'MEDIUM' and self.comingout == '':
+            elif self.base_info['myRole'] == 'MEDIUM' and self.comingout == '' and self.base_info["day"] > 1:
                 self.comingout = 'MEDIUM'
                 return cb.comingout(self.base_info['agentIdx'], self.comingout)
 
@@ -143,11 +145,8 @@ class PythonPlayer(object):
                     return cb.comingout(self.base_info['agentIdx'], self.comingout)
 
 
-            elif self.base_info['myRole'] == 'WEREWOLF' and self.comingout == '' and self.base_info["day"] < 4:
-                if self.predicter_15.num_seer() < 2 and rand() < 0.1 and self.base_info["day"] == 2: 
-                    self.comingout = 'SEER'
-                    return cb.comingout(self.base_info['agentIdx'], self.comingout)
-                elif self.predicter_15.num_seer() > 1 and self.predicter_15.num_medium() < 2 and rand() <0.1: 
+            elif self.base_info['myRole'] == 'WEREWOLF' and self.comingout == '' and self.base_info["day"] == 2:
+                if self.predicter_15.num_seer() > 1 and self.predicter_15.num_medium() < 2 and rand() <0.1: 
                     self.comingout = 'MEDIUM'
                     return cb.comingout(self.base_info['agentIdx'], self.comingout)
             # 2.report
@@ -173,9 +172,22 @@ class PythonPlayer(object):
                 elif  self.comingout == 'MEDIUM':
                     return self.fake_medium_result()
             # 3.declare vote if not yet
-            if self.vote_declare != self.vote():
-                self.vote_declare = self.vote()
-                return cb.vote(self.vote_declare)
+            if self.vote_declare != self.vote_declare_func():
+                if self.vote_prob() > 0.6:
+                    self.vote_declare = self.vote_declare_func()
+                    return cb.vote(self.vote_declare)
+
+            # 3.estimate werewolf if not yet
+            if self.estimate_werewolf != self.vote():
+                if self.vote_prob() > 0.8:
+                    self.estimate_werewolf = self.vote_declare_func()
+                    return cb.estimate(self.estimate_werewolf,'WEREWOLF')
+            # 3.estimate villager if not yet
+            if self.estimate_villager != self.estimate_villager_func():
+                if self.villager_prob() > 0.2:
+                    self.estimate_villager = self.estimate_villager_func()
+                    return cb.estimate(self.estimate_villager,'VILLAGER')
+
 
             # 4. skip
             if self.talk_turn <= 10:
@@ -192,8 +204,8 @@ class PythonPlayer(object):
             elif self.base_info['myRole'] == 'MEDIUM' and self.comingout == '':
                 self.comingout = 'MEDIUM'
                 return cb.comingout(self.base_info['agentIdx'], self.comingout)
-            elif self.base_info['myRole'] == 'POSSESSED' and self.comingout == '':
-                self.comingout = 'WEREWOLF'
+            elif self.base_info['myRole'] == 'POSSESSED' and self.comingout == ''  and self.base_info["day"] == 2:
+                self.comingout = 'SEER'
                 return cb.comingout(self.base_info['agentIdx'], self.comingout)
 
             # 2.report
@@ -214,6 +226,27 @@ class PythonPlayer(object):
             if self.vote_declare != self.vote():
                 self.vote_declare = self.vote()
                 return cb.vote(self.vote_declare)
+            # 3.estimate werewolf if not yet
+            if self.base_info['myRole'] == "POSSESSED":
+                if self.estimate_werewolf != self.vote():
+                    if self.vote_prob() > 0.8:
+                        self.estimate_werewolf = self.vote_declare_func()
+                        return cb.estimate(self.estimate_werewolf,'HUMAN')
+            # 3.estimate villager if not yet
+                if self.estimate_villager != self.estimate_villager_func():
+                    if self.villager_prob() > 0.2:
+                        self.estimate_villager = self.estimate_villager_func()
+                        return cb.estimate(self.estimate_villager,'WEREWOLF')
+            else:
+                if self.estimate_werewolf != self.vote():
+                    if self.vote_prob() > 0.8:
+                        self.estimate_werewolf = self.vote_declare_func()
+                        return cb.estimate(self.estimate_werewolf,'WEREWOLF')
+            # 3.estimate villager if not yet
+                if self.estimate_villager != self.estimate_villager_func():
+                    if self.villager_prob() > 0.2:
+                        self.estimate_villager = self.estimate_villager_func()
+                        return cb.estimate(self.estimate_villager,'VILLAGER')
 
             # 4. skip
             if self.talk_turn <= 10:
@@ -223,6 +256,108 @@ class PythonPlayer(object):
 
     def whisper(self):
         return cb.skip()
+
+    def vote_declare_func(self):
+        if self.game_setting['playerNum'] == 15:
+            p0_mat = self.predicter_15.ret_pred_wn()
+                # highest prob ww in alive agents provided watashi ningen
+            p = -1
+            idx = 1
+            for i in range(1, 16):
+                p0 = p0_mat[i-1, 1]
+                if self.base_info['agentIdx'] != idx and self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return idx
+        else:
+            p0_mat = self.predicter_5.ret_pred_wx(0)
+            p = -1
+            idx = 1
+            for i in range(1, 6):
+                p0 = p0_mat[i-1, 1]
+                if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return idx
+
+    def villager_prob(self):
+        if self.game_setting['playerNum'] == 15:
+            list_seer= list(self.predicter_15.list_seer())
+            list_medium= list(self.predicter_15.list_medium())
+            p0_mat = self.predicter_15.ret_pred_wn()
+            # highest prob ww in alive agents provided watashi ningen
+            p = -1
+            idx = 1
+            for i in range(1, 16):
+                p0 = p0_mat[i-1, 0]
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
+                if list_seer[i-1] != 1 and list_medium[i-1] != 1 and self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return p
+        else:
+            p0_mat = self.predicter_5.ret_pred_wx(0)
+            p = -1
+            idx = 1
+            for i in range(1, 6):
+                p0 = p0_mat[i-1, 0]
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
+                if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return p
+
+    def estimate_villager_func(self):
+        if self.game_setting['playerNum'] == 15:
+            list_seer= list(self.predicter_15.list_seer())
+            list_medium= list(self.predicter_15.list_medium())
+            p0_mat = self.predicter_15.ret_pred_wn()
+            # highest prob ww in alive agents provided watashi ningen
+            p = -1
+            idx = 1
+            for i in range(1, 16):
+                p0 = p0_mat[i-1, 0]
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
+                if list_seer[i-1] != 1 and list_medium[i-1] != 1 and self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return idx
+        else:
+            p0_mat = self.predicter_5.ret_pred_wx(0)
+            p = -1
+            idx = 1
+            for i in range(1, 6):
+                p0 = p0_mat[i-1, 0]
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
+                if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+        return idx
+
+    def vote_prob(self):
+        if self.game_setting['playerNum'] == 15:
+            p0_mat = self.predicter_15.ret_pred_wn()
+            # highest prob ww in alive agents provided watashi ningen
+            p = -1
+            idx = 1
+            for i in range(1, 16):
+                p0 = p0_mat[i-1, 1]
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
+                if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return p
+        else:
+            p0_mat = self.predicter_5.ret_pred_wx(0)
+            p = -1
+            idx = 1
+            for i in range(1, 6):
+                p0 = p0_mat[i-1, 1]
+                p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
+                if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
+                    p = p0
+                    idx = i
+            return p
 
     def vote(self):
         if self.game_setting['playerNum'] == 15:
@@ -266,7 +401,7 @@ class PythonPlayer(object):
                 p = -1
                 idx = 1
                 for i in range(1, 6):
-                    p0 = p0_mat[i-1, 3]
+                    p0 = p0_mat[i-1, 1]
                     p0 *= self.threat_factor[int(self.base_info['day'])-1][i-1]
                     if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                         p = p0
@@ -409,17 +544,17 @@ class PythonPlayer(object):
             for i in range(1, 16):
                 p0 = p0_mat[i-1, 0]
                 if list_seer[i-1] == 1 and day < 4:
-                    if self.attack_result[day-2][2] > 9 :
-                        x = (float(self.attack_result[day-2][0])/float(self.attack_result[day-2][2]))
+                    if self.attack_result[day-1][2] > 9 :
+                        x = (float(self.attack_result[day-1][0])/float(self.attack_result[day-1][2]))
                     else:
                         x = 0.3
-                    p0 *= self.guard_factor[day-2][0]*x
+                    p0 *= self.guard_factor[day-1][0]*x
                 elif list_medium[i-1] == 1 and day < 4:
-                    if self.attack_result[day-2][2]  > 9 :
-                        x = (float(self.attack_result[day-2][1])/float(self.attack_result[day-2][2]))
+                    if self.attack_result[day-1][2]  > 9 :
+                        x = (float(self.attack_result[day-1][1])/float(self.attack_result[day-1][2]))
                     else:
                         x = 0.2
-                    p0 *= self.guard_factor[day-2][0]*x
+                    p0 *= self.guard_factor[day-1][0]*x
                 if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                     p = p0
                     idx = i
