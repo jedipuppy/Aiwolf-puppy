@@ -408,9 +408,9 @@ class PythonPlayer(object):
             for i in range(1, 16):
                 p0 = p0_mat[i-1, 0]
                 if list_seer[i-1] == 1 and day < 4:
-                    p0 *= self.guard_factor[day-2][0]
+                    p0 *= self.guard_factor[day-1][0]
                 elif list_medium[i-1] == 1 and day < 4:
-                    p0 *= self.guard_factor[day-2][1]
+                    p0 *= self.guard_factor[day-1][1]
                 if self.base_info['statusMap'][str(i)] == 'ALIVE' and p0 > p:
                     p = p0
                     idx = i
@@ -433,12 +433,7 @@ class PythonPlayer(object):
                 else:
                     self.guard_factor[i][0] *= 0.95  
                     self.guard_factor[i][0] *= 0.95 
-        print("guard factor") 
-        print(self.guard_factor)
-        print("role map") 
-        print(self.base_info['roleMap'])
-        print("threat_factor") 
-        print(self.threat_factor)
+
 
 
     def fake_seer(self):
